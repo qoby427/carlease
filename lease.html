@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lease Calculator (MSD)</title>
+<style>
+    body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; }
+    input { width: 100%; padding: 10px; margin: 8px 0; font-size: 16px; }
+    label { font-weight: bold; }
+    .note { font-size: 14px; color: #555; margin-top: -4px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h2>Lease Calculator (MSD)</h2>
+
+<label>Car Price (V)</label>
+<input id="price" type="number" step="0.01">
+
+<label>Residual %</label>
+<input id="residual" type="number" step="0.1" value="60">
+
+<label>APR %</label>
+<input id="apr" type="number" step="0.01">
+
+<label>Lease Term (months)</label>
+<input id="months" type="number" value="36">
+
+<label>Sales Tax %</label>
+<input id="tax" type="number" step="0.1">
+
+<label>MSDs (0–10)</label>
+<input id="msd" type="number" step="1" min="0" max="10">
+<div id="msdTotal" class="note"></div>
+<div class="note">Each MSD reduces MF by 0.00007 (refundable at lease end).</div>
+
+<label>Monthly Payment</label>
+<input id="monthly" type="number" step="0.01" readonly>
+
+<script>
+// -------------------------
+// Persistence
+// -------------------------
+function saveState() {
+    const fields = ["price","residual","apr","months","tax","msd"];
+    fields.forEach(id => {
+        localStorage.setItem("lease_msd_" + id, document.getElementById(id).value);
+    });
+}
+
+function loadState() {
+    const fields = ["price","residual","apr","months","tax","msd"];
+    fields.forEach(id => {
+        const saved = localStorage.getItem("lease_msd_" + id);
+        if (saved !== null) {
+            document.getElementById(id).value = saved;
+        }
+    });
+}
+
+// -------------------------
+// Core compute engine
+// -------------------------
+function compute() {
+    let V = parseFloat(price.value) || 0;
+    let r = (parseFloat(residual.value) || 0) / 100;
+    let aprVal = parseFloat(apr.value) || 0;
+    let N = parseFloat(months.value) || 1;
+    let T = (parseFloat(tax.value) || 0) / 100;
+    let msdCount = parseInt(msd.value) || 0;
+
+    if (msdCount < 0) msdCount = 0;
+    if (msdCount > 10) msdCount = 10;
+    msd.value = msdCount;
+
+    // Base MF from APR
+    let MF = aprVal / 2400;
+
+    // MSD reduction: 0.00007 per MSD
+    let MF_reduction = 0.00007 * msdCount;
+    let MF_eff = MF - MF_reduction;
+    if (MF_eff < 0) MF_eff = 0;
+
+    let RV = V * r;
+
+    // Standard lease formula (no cap reduction)
+    let depreciation = (V - RV) / N;
+    let finance = (V + RV) * MF_eff;
+    let base = depreciation + finance;
+    let result = base * (1 + T);
+	// After computing base monthly (before tax)
+	let oneMSD = Math.ceil(base / 50) * 50;
+	let totalMSD = oneMSD * msdCount;
+
+	document.getElementById("msdTotal").textContent =
+		"Total MSD: $" + totalMSD.toLocaleString();
+
+    if (isFinite(result)) {
+        monthly.value = result.toFixed(2);
+    } else {
+        monthly.value = "";
+    }
+
+    saveState();
+}
+
+// -------------------------
+// Listeners
+// -------------------------
+["price","residual","apr","months","tax","msd"].forEach(id => {
+    document.getElementById(id).addEventListener("input", compute);
+});
+
+// -------------------------
+// Startup
+// -------------------------
+loadState();
+compute();
+</script>
+
+</body>
+</html>
